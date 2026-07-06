@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: electri-incom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: electri_incom
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./Backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d electri_incom"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: electri-incom-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - ./Backend/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./Backend/pgadmin/pgpass:/pgpass:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./Backend
+    container_name: electri-incom-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      FRONTEND_URL: http://localhost:5173,http://127.0.0.1:5173
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: electri_incom
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_SSL: "false"
+    ports:
+      - "3001:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./Frontend
+    container_name: electri-incom-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
