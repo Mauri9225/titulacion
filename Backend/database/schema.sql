@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS work_orders (
   status VARCHAR(40) NOT NULL DEFAULT 'Recibido',
   date VARCHAR(30) NOT NULL,
   technician VARCHAR(80) NOT NULL DEFAULT 'Tecnico',
+  delivered_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -95,7 +96,7 @@ VALUES
   ('P005', 'Estuche protector', 'Protectores', 5, 12, 4.00)
 ON CONFLICT (id) DO NOTHING;
 
--- Work orders sample data removed to allow fresh numbering from #0001.
+-- Work orders sample data removed to allow fresh numbering from 0001.
 INSERT INTO sales (id, customer, subtotal, discount, total, payment_method)
 VALUES ('V-0001', 'Consumidor final', 5.50, 0, 5.50, 'Efectivo')
 ON CONFLICT (id) DO NOTHING;

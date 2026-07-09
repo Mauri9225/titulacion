@@ -1,5 +1,5 @@
 import { Lock, Eye, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../components/ui/PageHeader'
 import useApiResource from '../hooks/useApiResource'
 import { api } from '../services/api'
@@ -18,6 +18,8 @@ function money(value) {
 }
 
 function CashClose() {
+  // Reporte diario admin desactivado temporalmente para futuras mejoras.
+  const showAdminDailyReport = false
   const { user } = useAuth()
   const [countedCash, setCountedCash] = useState(0)
   const [openingCash, setOpeningCash] = useState(55)
@@ -43,15 +45,71 @@ function CashClose() {
   const [reports, setReports] = useState([])
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState(null)
+  const [salesDetailsOpen, setSalesDetailsOpen] = useState(false)
+  const [servicesDetailsOpen, setServicesDetailsOpen] = useState(false)
+  const [salesDetails, setSalesDetails] = useState([])
+  const [servicesDetails, setServicesDetails] = useState([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const isAdmin = user?.role === 'admin'
   const isClosed = Boolean(cashSummary.closedAt)
   const displayUser = user?.name || cashSummary.user || 'Tecnico'
+  const currentDate = useMemo(() => new Date().toLocaleDateString('es-EC'), [])
   const visibleReports = reports.slice(0, 5)
   const hasMoreReports = reports.length > 5
+  const reportSalesByProduct = useMemo(() => {
+    const productTotals = new Map()
+    const sales = selectedReport?.details?.sales || []
+
+    sales.forEach((sale) => {
+      const items = sale.items || []
+      if (!items.length) {
+        const previous = productTotals.get('Venta sin detalle') || 0
+        productTotals.set('Venta sin detalle', previous + Number(sale.total || 0))
+        return
+      }
+
+      items.forEach((item) => {
+        const name = item.name || 'Producto sin nombre'
+        const amount = Number(item.price || 0) * Number(item.quantity || 1)
+        const previous = productTotals.get(name) || 0
+        productTotals.set(name, previous + amount)
+      })
+    })
+
+    return Array.from(productTotals.entries()).map(([name, totalAmount]) => ({
+      name,
+      totalAmount,
+    }))
+  }, [selectedReport])
+
+  const reportSalesTotal = useMemo(
+    () => reportSalesByProduct.reduce((sum, product) => sum + product.totalAmount, 0),
+    [reportSalesByProduct],
+  )
+
+  const reportServiceTransactions = useMemo(
+    () =>
+      (selectedReport?.details?.services || []).map((service) => ({
+        label: `Orden ${service.id} ${String(service.paymentType || 'pago').toLowerCase()}`,
+        amount: Number(service.serviceCost || 0),
+      })),
+    [selectedReport],
+  )
+
+  const reportServicesTotal = useMemo(
+    () => reportServiceTransactions.reduce((sum, tx) => sum + tx.amount, 0),
+    [reportServiceTransactions],
+  )
 
   useEffect(() => {
-    setCountedCash(cashSummary.countedCash ?? 0)
-    setOpeningCash(cashSummary.openingCash ?? 55)
+    // Solo se ejecuta cuando el usuario cambia (login/logout)
+    // Limpiar datos de la sesión anterior
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSalesDetails([])
+    setServicesDetails([])
+    setSalesDetailsOpen(false)
+    setServicesDetailsOpen(false)
+    
     // If the app just started a fresh session on login, show zeroed totals immediately
     try {
       const fresh = localStorage.getItem('electriIncomFreshSession')
@@ -63,26 +121,48 @@ function CashClose() {
           countedCash: 0,
           openingCash: 55,
           openedAt: new Date().toISOString(),
+          closedAt: null,
         }))
         localStorage.removeItem('electriIncomFreshSession')
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
+  }, [user?.id, setData])
+
+  useEffect(() => {
+    // Actualizar solo los campos sin limpiar todo
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCountedCash(cashSummary.countedCash ?? 0)
+    setOpeningCash(cashSummary.openingCash ?? 55)
   }, [cashSummary.countedCash, cashSummary.openingCash])
 
-  async function loadReports() {
+  const loadReports = useCallback(async () => {
+    if (!showAdminDailyReport) {
+      setReports([])
+      return
+    }
+
     try {
       const nextReports = await api.cashClose.getReports()
       setReports(nextReports)
     } catch {
       setReports([])
     }
-  }
+  }, [showAdminDailyReport])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadReports()
-  }, [])
+  }, [loadReports])
+
+  useEffect(() => {
+    // Cuando el usuario cambia (logout/login), recarga los datos desde el backend
+    if (user?.id) {
+      reload()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]) // Solo cuando el ID del usuario cambia
 
   async function closeCash() {
     if (isClosed) return
@@ -95,7 +175,7 @@ function CashClose() {
       user: user?.name || cashSummary.user,
     })
     await loadReports()
-    reload()
+    await reload()
   }
 
   function openReportDetail(report) {
@@ -104,6 +184,151 @@ function CashClose() {
 
   function closeReportDetail() {
     setSelectedReport(null)
+  }
+
+  async function loadSalesDetails() {
+    setLoadingDetails(true)
+    try {
+      const sales = await api.sales.list()
+      
+      // Validar que tenemos openedAt
+      if (!cashSummary.openedAt) {
+        setSalesDetails([])
+        setData((prev) => ({
+          ...prev,
+          salesTotal: 0,
+        }))
+        setSalesDetailsOpen(true)
+        return
+      }
+      
+      // Filtrar ventas de la sesión activa actual (desde openedAt)
+      const sessionStart = new Date(cashSummary.openedAt).getTime()
+      const todaySales = (sales || []).filter((sale) => {
+        const saleTime = new Date(sale.date || sale.createdAt).getTime()
+        return saleTime >= sessionStart
+      })
+      setSalesDetails(todaySales)
+      // Calcula el total correcto desde los items
+      const correctTotal = todaySales.flatMap((sale) => sale.items || []).reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0)
+      setData((prev) => ({
+        ...prev,
+        salesTotal: correctTotal,
+      }))
+      setSalesDetailsOpen(true)
+    } catch (error) {
+      console.error('Error cargando ventas:', error)
+      setSalesDetails([])
+      setSalesDetailsOpen(true)
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  async function loadServicesDetails() {
+    setLoadingDetails(true)
+    try {
+      const services = await api.workOrders.list('', '')
+      
+      console.log('📋 Servicios obtenidos del API:', services)
+      console.log('📋 cashSummary.openedAt:', cashSummary.openedAt)
+      
+      // Validar que tenemos openedAt
+      if (!cashSummary.openedAt) {
+        console.log('⚠️ No hay openedAt disponible')
+        setServicesDetails([])
+        setData((prev) => ({
+          ...prev,
+          serviceTotal: 0,
+        }))
+        setServicesDetailsOpen(true)
+        return
+      }
+      
+      // Filtrar servicios que fueron creados O entregados en esta sesión
+      const sessionStart = new Date(cashSummary.openedAt).getTime()
+      console.log('🔍 sessionStart timestamp:', sessionStart, 'fecha:', new Date(sessionStart))
+      
+      const todayServices = (services || []).filter((service) => {
+        const createdTime = new Date(service.createdAt).getTime()
+        const deliveredTime = service.deliveredAt ? new Date(service.deliveredAt).getTime() : null
+        
+        console.log(`✓ Servicio ${service.id}:`, {
+          createdAt: service.createdAt,
+          createdTime,
+          deliveredAt: service.deliveredAt,
+          deliveredTime,
+          incluido: (createdTime >= sessionStart) || (deliveredTime && deliveredTime >= sessionStart)
+        })
+        
+        // Incluir si fue creado desde openedAt O entregado desde openedAt
+        return (createdTime >= sessionStart) || (deliveredTime && deliveredTime >= sessionStart)
+      })
+      
+      console.log('📌 Servicios filtrados para hoy:', todayServices.length)
+      
+      setServicesDetails(todayServices)
+      
+      // Calcular total con la lógica correcta:
+      // - Si creado Y entregado hoy: sumar abono + saldo (o service_cost si no hay saldo)
+      // - Si entregado hoy (sin crear hoy): sumar saldo (o service_cost si no hay saldo)
+      // - Si creado hoy pero NO entregado: sumar abono
+      let correctServiceTotal = 0
+      todayServices.forEach((service) => {
+        const createdTime = new Date(service.createdAt).getTime()
+        const deliveredTime = service.deliveredAt ? new Date(service.deliveredAt).getTime() : null
+        
+        const isDeliveredToday = deliveredTime && deliveredTime >= sessionStart
+        const isCreatedToday = createdTime >= sessionStart
+        
+        console.log(`💰 Cálculo para ${service.id}:`, {
+          isDeliveredToday,
+          isCreatedToday,
+          balance: service.balance,
+          serviceCost: service.serviceCost,
+          downpayment: service.downpayment,
+        })
+        
+        if (isCreatedToday && isDeliveredToday) {
+          // Si fue CREADO Y ENTREGADO el mismo día: sumar abono + saldo
+          const downpayment = Number(service.downpayment || 0)
+          const balance = Number(service.balance || 0)
+          const serviceCost = Number(service.serviceCost || 0)
+          const finalAmount = balance > 0 ? balance : serviceCost
+          
+          correctServiceTotal += downpayment + finalAmount
+          console.log(`  → Creado y Entregado: suma ${downpayment} (abono) + ${finalAmount} (${balance > 0 ? 'saldo' : 'servicio'}) = ${downpayment + finalAmount}`)
+        } else if (isDeliveredToday) {
+          // Si fue SOLO ENTREGADO: sumar saldo (o service_cost si no hay saldo)
+          const balance = Number(service.balance || 0)
+          const serviceCost = Number(service.serviceCost || 0)
+          const amount = balance > 0 ? balance : serviceCost
+          
+          correctServiceTotal += amount
+          console.log(`  → Solo Entregado: suma ${amount} (${balance > 0 ? 'saldo' : 'servicio'})`)
+        } else if (isCreatedToday && !deliveredTime) {
+          // Si fue SOLO CREADO (no entregado): sumar abono
+          const abono = Number(service.downpayment || 0)
+          correctServiceTotal += abono
+          console.log(`  → Solo Creado: suma ${abono} (abono)`)
+        }
+      })
+      
+      console.log('💵 Total servicios calculado:', correctServiceTotal)
+      
+      setData((prev) => ({
+        ...prev,
+        serviceTotal: correctServiceTotal,
+      }))
+      
+      setServicesDetailsOpen(true)
+    } catch (error) {
+      console.error('Error cargando servicios:', error)
+      setServicesDetails([])
+      setServicesDetailsOpen(true)
+    } finally {
+      setLoadingDetails(false)
+    }
   }
 
   return (
@@ -119,25 +344,27 @@ function CashClose() {
       <section className="panel cash-panel">
         <div className="cash-meta">
           <span>
-            Fecha: <strong>{cashSummary.date}</strong>
+            Fecha: <strong>{currentDate}</strong>
           </span>
           <span>
             Usuario: <strong>{displayUser}</strong>
           </span>
+          {/*
           <span>
             Inicio jornada: <strong>{formatDateTime(cashSummary.openedAt)}</strong>
           </span>
           <span>
             Fin jornada: <strong>{formatDateTime(cashSummary.closedAt)}</strong>
           </span>
+          */}
         </div>
 
         <div className="cash-summary">
           <h2>Resumen del dia</h2>
-          <p>
+          <p style={{ cursor: 'pointer' }} onClick={loadSalesDetails} title="Haz clic para ver detalles">
             Total ventas (POS): <strong>{money(cashSummary.salesTotal)}</strong>
           </p>
-          <p>
+          <p style={{ cursor: 'pointer' }} onClick={loadServicesDetails} title="Haz clic para ver detalles">
             Total servicios (reparaciones): <strong>{money(cashSummary.serviceTotal)}</strong>
           </p>
           <p>
@@ -149,8 +376,14 @@ function CashClose() {
               type="number"
               min="0"
               step="0.01"
-              value={openingCash}
-              onChange={(event) => setOpeningCash(Number(event.target.value) || 55)}
+              placeholder="0.00"
+              value={openingCash || ''}
+              disabled={isClosed}
+              onChange={(event) => {
+                const val = event.target.value.replace(',', '.')
+                const num = parseFloat(val)
+                setOpeningCash(isNaN(num) ? 0 : num)
+              }}
             />
           </p>
           <p>
@@ -159,8 +392,14 @@ function CashClose() {
               type="number"
               min="0"
               step="0.01"
-              value={countedCash}
-              onChange={(event) => setCountedCash(Number(event.target.value) || 0)}
+              placeholder="0.00"
+              value={countedCash || ''}
+              disabled={isClosed}
+              onChange={(event) => {
+                const val = event.target.value.replace(',', '.')
+                const num = parseFloat(val)
+                setCountedCash(isNaN(num) ? 0 : num)
+              }}
             />
           </p>
           <p className="difference">
@@ -174,7 +413,7 @@ function CashClose() {
         </button>
       </section>
 
-      {isAdmin ? (
+      {isAdmin && showAdminDailyReport ? (
         <section className="panel">
           <div className="panel-title">
             <h2>Reporte diario de jornada</h2>
@@ -214,7 +453,7 @@ function CashClose() {
         </section>
       ) : null}
 
-      {isHistoryModalOpen ? (
+      {showAdminDailyReport && isHistoryModalOpen ? (
         <div
           className="modal-overlay"
           onClick={(event) => {
@@ -260,7 +499,7 @@ function CashClose() {
         </div>
       ) : null}
 
-      {selectedReport ? (
+      {showAdminDailyReport && selectedReport ? (
         <div
           className="modal-overlay"
           onClick={(event) => {
@@ -303,51 +542,63 @@ function CashClose() {
 
             <div style={{ padding: '20px 0' }}>
               <h3 style={{ marginBottom: '16px' }}>Movimientos registrados</h3>
-              {selectedReport.details?.sales?.length ? (
-                <section style={{ marginBottom: '24px' }}>
-                  <h4 style={{ marginBottom: '12px' }}>Ventas</h4>
-                  <div style={{ display: 'grid', gap: '12px' }}>
-                    {selectedReport.details.sales.map((sale) => (
-                      <div key={sale.id} style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                          <strong>{sale.id}</strong>
-                          <span style={{ color: '#6b7280' }}>{formatDateTime(sale.date)}</span>
-                        </div>
-                        <div style={{ marginTop: '8px', color: '#374151' }}>Método: {sale.paymentMethod}</div>
-                        {sale.items?.length ? (
-                          <div style={{ marginTop: '8px', color: '#374151' }}>
-                            Productos: {sale.items.map((item) => `${item.name} x${item.quantity}`).join(', ')}
-                          </div>
-                        ) : null}
-                        <div style={{ marginTop: '8px', fontWeight: 600 }}>Total: {money(sale.total)}</div>
+              {reportSalesByProduct.length ? (
+                <section style={{ marginBottom: '20px' }}>
+                  <h4 style={{ marginBottom: '10px' }}>Ventas</h4>
+                  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
+                    {reportSalesByProduct.map((product) => (
+                      <div
+                        key={product.name}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          paddingBottom: '8px',
+                          borderBottom: '1px solid #eef2f7',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <span>{product.name}</span>
+                        <strong>{money(product.totalAmount)}</strong>
                       </div>
                     ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontWeight: 700, color: '#008a3d' }}>
+                      <span>Total</span>
+                      <span>{money(reportSalesTotal)}</span>
+                    </div>
                   </div>
                 </section>
               ) : null}
 
-              {selectedReport.details?.services?.length ? (
-                <section style={{ marginBottom: '24px' }}>
-                  <h4 style={{ marginBottom: '12px' }}>Servicios</h4>
-                  <div style={{ display: 'grid', gap: '12px' }}>
-                    {selectedReport.details.services.map((service) => (
-                      <div key={service.id} style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                          <strong>{service.device}</strong>
-                          <span style={{ color: '#6b7280' }}>{service.status}</span>
-                        </div>
-                        <div style={{ marginTop: '8px', color: '#374151' }}>Cliente: {service.client}</div>
-                        {service.repairDescription ? (
-                          <div style={{ marginTop: '8px', color: '#374151' }}>Detalle: {service.repairDescription}</div>
-                        ) : null}
-                        <div style={{ marginTop: '8px', fontWeight: 600 }}>Costo: {money(service.serviceCost)}</div>
+              {reportServiceTransactions.length ? (
+                <section style={{ marginBottom: '20px' }}>
+                  <h4 style={{ marginBottom: '10px' }}>Servicios</h4>
+                  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
+                    {reportServiceTransactions.map((tx, index) => (
+                      <div
+                        key={`${tx.label}-${index}`}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          paddingBottom: '8px',
+                          borderBottom: '1px solid #eef2f7',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <span>{tx.label}</span>
+                        <strong>{money(tx.amount)}</strong>
                       </div>
                     ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontWeight: 700, color: '#008a3d' }}>
+                      <span>Total</span>
+                      <span>{money(reportServicesTotal)}</span>
+                    </div>
                   </div>
                 </section>
               ) : null}
 
-              {!selectedReport.details?.sales?.length && !selectedReport.details?.services?.length ? (
+              {!reportSalesByProduct.length && !reportServiceTransactions.length ? (
                 <p className="muted-message">No se registraron movimientos para esta jornada.</p>
               ) : null}
             </div>
@@ -368,6 +619,162 @@ function CashClose() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {salesDetailsOpen ? (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSalesDetailsOpen(false)
+            }
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <div>
+                <h2>Detalle de ventas (POS)</h2>
+                <span>Transacciones del día</span>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setSalesDetailsOpen(false)}
+              >
+                <X size={16} />
+                Cerrar
+              </button>
+            </div>
+
+            {loadingDetails ? (
+              <p className="muted-message">Cargando detalles...</p>
+            ) : salesDetails.length === 0 ? (
+              <p className="muted-message">No hay ventas registradas hoy.</p>
+            ) : (
+              <div style={{ padding: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+                {salesDetails.flatMap((sale) => sale.items || []).length > 0 ? (
+                  <>
+                    {salesDetails.flatMap((sale) => sale.items || []).map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                        <span>{item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}</span>
+                        <span style={{ fontWeight: 600 }}>{money(item.price * (item.quantity || 1))}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '12px', paddingTop: '12px', borderTop: '2px solid #172033', fontWeight: 700, color: '#008a3d', fontSize: '16px' }}>
+                      <span>TOTAL</span>
+                      <span>{money(salesDetails.flatMap((sale) => sale.items || []).reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0))}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {salesDetails.map((sale, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: idx < salesDetails.length - 1 ? '1px solid #e2e8f0' : 'none', marginBottom: '8px' }}>
+                        <span>Venta registrada</span>
+                        <span style={{ fontWeight: 600 }}>{money(sale.total || 0)}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '12px', paddingTop: '12px', borderTop: '2px solid #172033', fontWeight: 700, color: '#008a3d', fontSize: '16px' }}>
+                      <span>TOTAL</span>
+                      <span>{money(salesDetails.reduce((acc, sale) => acc + (sale.total || 0), 0))}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {servicesDetailsOpen ? (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setServicesDetailsOpen(false)
+            }
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <div>
+                <h2>Detalle de servicios</h2>
+                <span>Reparaciones del día</span>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setServicesDetailsOpen(false)}
+              >
+                <X size={16} />
+                Cerrar
+              </button>
+            </div>
+
+            {loadingDetails ? (
+              <p className="muted-message">Cargando detalles...</p>
+            ) : servicesDetails.length === 0 ? (
+              <p className="muted-message">No hay servicios registrados hoy.</p>
+            ) : (
+              <div style={{ padding: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc' }}>
+                {servicesDetails.map((service) => {
+                  if (!cashSummary.openedAt) return null
+                  
+                  const sessionStart = new Date(cashSummary.openedAt).getTime()
+                  const createdTime = new Date(service.createdAt).getTime()
+                  const deliveredTime = service.deliveredAt ? new Date(service.deliveredAt).getTime() : null
+                  
+                  const isDeliveredToday = deliveredTime && deliveredTime >= sessionStart
+                  const isCreatedToday = createdTime >= sessionStart
+                  
+                  // Coleccionar transacciones de esta orden
+                  const transactions = []
+                  
+                  // Si fue creado hoy, añadir abono (si existe)
+                  if (isCreatedToday) {
+                    const downpayment = Number(service.downpayment || 0)
+                    if (downpayment > 0) {
+                      transactions.push({
+                        id: `${service.id}-abono`,
+                        serviceId: service.id,
+                        type: 'Abono',
+                        amount: downpayment
+                      })
+                    }
+                  }
+                  
+                  // Si fue entregado hoy, añadir saldo o service_cost
+                  if (isDeliveredToday) {
+                    const balance = Number(service.balance || 0)
+                    const serviceCost = Number(service.serviceCost || 0)
+                    const amount = balance > 0 ? balance : serviceCost
+                    const type = balance > 0 ? 'Saldo' : 'Servicio'
+                    
+                    if (amount > 0) {
+                      transactions.push({
+                        id: `${service.id}-${type.toLowerCase()}`,
+                        serviceId: service.id,
+                        type,
+                        amount
+                      })
+                    }
+                  }
+                  
+                  // Renderizar todas las transacciones de esta orden
+                  return transactions.map((tx) => (
+                    <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                      <span>{tx.serviceId} - {tx.type}</span>
+                      <span style={{ fontWeight: 600 }}>{money(tx.amount)}</span>
+                    </div>
+                  ))
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '12px', paddingTop: '12px', borderTop: '2px solid #172033', fontWeight: 700, color: '#008a3d', fontSize: '16px' }}>
+                  <span>TOTAL</span>
+                  <span>{money(cashSummary.serviceTotal)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

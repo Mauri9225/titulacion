@@ -43,78 +43,125 @@ function WorkOrders() {
     const receipt = order || receiptOrder
     if (!receipt) return
 
+    const escapeHtml = (value) =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+
+    const formatCurrency = (value) => `$ ${(Number(value || 0)).toFixed(2)}`
+    const serviceCost = Number(receipt.serviceCost || 0)
+    const downpayment = Number(receipt.downpayment || 0)
+    const balance = Number(receipt.balance || 0)
+    const status = receipt.status || 'Recibido'
+    const notes = receipt.notes || receipt.fault || ''
+
     const html = `<!doctype html>
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>Recibo Orden ${receipt.id}</title>
+          <title>Recibo Orden ${escapeHtml(receipt.id)}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
-            h1 { margin-bottom: 0; font-size: 22px; }
-            p { margin: 4px 0; }
-            .header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+            h1 { margin: 0 0 6px 0; font-size: 22px; }
+            p { margin: 4px 0; line-height: 1.4; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+            .company-info { text-align: center; flex: 1; }
+            .receipt-title { font-size: 15px; margin-top: 4px; }
+            .company-details { font-size: 12px; color: #4b5563; }
+            .header-meta { text-align: right; min-width: 140px; }
             .section { margin-bottom: 18px; }
             .section h2 { margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #4b5563; }
             table { width: 100%; border-collapse: collapse; margin-top: 8px; }
             td { padding: 8px 6px; border: 1px solid #d1d5db; vertical-align: top; }
             .notes { white-space: pre-wrap; }
-            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
             .footer { margin-top: 20px; font-size: 12px; color: #4b5563; }
+            .footer ul { margin: 8px 0 0 18px; padding: 0; }
+            .footer li { margin-bottom: 4px; }
+            .signature-section { display: flex; justify-content: space-between; gap: 24px; margin-top: 28px; }
+            .signature-block { flex: 1; text-align: center; }
+            .signature-line { border-top: 1px solid #111; margin: 48px auto 6px; width: 80%; }
+            .signature-label { font-size: 12px; color: #4b5563; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div>
-              <h1>Recibo de Orden</h1>
-              <p><strong>${receipt.id}</strong></p>
+            <div class="company-info">
+              <h1>ELECTRI-INCOM</h1>
+              <p class="receipt-title"><strong>ORDEN DE TRABAJO ${escapeHtml(receipt.id)}</strong></p>
+              <p class="company-details">Instalación, mantenimiento y reparación de sistemas de comunicación.</p>
+              <p class="company-details">Venta al por menor de aparatos de comunicación.</p>
+              <p class="company-details">Dirección: Av. Pedro Vicente Maldonado y Joaquín Gutiérrez esquina.</p>
+              <p class="company-details">Teléfono: 0997657790 · Quito - Ecuador</p>
             </div>
-            <div>
-              <p><strong>Fecha:</strong> ${receipt.date}</p>
-              <p><strong>Estado:</strong> ${receipt.status}</p>
+            <div class="header-meta">
+              <p><strong>Fecha:</strong> ${escapeHtml(receipt.date || '')}</p>
+              <p><strong>Estado:</strong> ${escapeHtml(status)}</p>
             </div>
           </div>
 
           <div class="section">
             <h2>Cliente</h2>
             <table>
-              <tr><td><strong>Nombre</strong></td><td>${receipt.client}</td></tr>
-              <tr><td><strong>Cedula/RUC</strong></td><td>${receipt.document}</td></tr>
-              <tr><td><strong>Teléfono</strong></td><td>${receipt.phone}</td></tr>
+              <tr><td><strong>Nombre</strong></td><td>${escapeHtml(receipt.client || '')}</td></tr>
+              <tr><td><strong>Cedula/RUC</strong></td><td>${escapeHtml(receipt.document || '')}</td></tr>
+              <tr><td><strong>Teléfono</strong></td><td>${escapeHtml(receipt.phone || '')}</td></tr>
             </table>
           </div>
 
           <div class="section">
             <h2>Equipo</h2>
             <table>
-              <tr><td><strong>Dispositivo</strong></td><td>${receipt.device}</td></tr>
-              <tr><td><strong>Marca</strong></td><td>${receipt.brand || 'N/A'}</td></tr>
-              <tr><td><strong>Modelo</strong></td><td>${receipt.model || 'N/A'}</td></tr>
-              <tr><td><strong>Falla reportada</strong></td><td class="notes">${receipt.fault}</td></tr>
+              <tr><td><strong>Dispositivo</strong></td><td>${escapeHtml(receipt.device || '')}</td></tr>
+              <tr><td><strong>Marca</strong></td><td>${escapeHtml(receipt.brand || 'N/A')}</td></tr>
+              <tr><td><strong>Modelo</strong></td><td>${escapeHtml(receipt.model || 'N/A')}</td></tr>
+              <tr><td><strong>Falla reportada</strong></td><td class="notes">${escapeHtml(receipt.fault || '')}</td></tr>
+              ${notes ? `<tr><td><strong>Observaciones</strong></td><td class="notes">${escapeHtml(notes)}</td></tr>` : ''}
             </table>
           </div>
 
           <div class="section">
             <h2>Pago</h2>
             <table>
-              <tr><td><strong>Costo servicio</strong></td><td>$ ${receipt.serviceCost.toFixed(2)}</td></tr>
-              <tr><td><strong>Abono</strong></td><td>$ ${receipt.downpayment.toFixed(2)}</td></tr>
-              <tr><td><strong>Saldo</strong></td><td>$ ${receipt.balance.toFixed(2)}</td></tr>
+              <tr><td><strong>Costo servicio</strong></td><td>${formatCurrency(serviceCost)}</td></tr>
+              <tr><td><strong>Abono</strong></td><td>${formatCurrency(downpayment)}</td></tr>
+              <tr><td><strong>Saldo</strong></td><td>${formatCurrency(balance)}</td></tr>
             </table>
           </div>
 
           <div class="section footer">
-            <p>Presente este recibo al entregar el equipo.</p>
+            <p>Presente este recibo para retirar el equipo.</p>
+            <ul>
+              <li>El establecimiento no se responsabiliza por chips olvidados en los equipos.</li>
+              <li>Pasados los 30 días desde la fecha de emisión, los equipos serán rematados sin opción a reclamo.</li>
+              <li>El establecimiento no se responsabiliza por la procedencia de los equipos que se entregan a servicio técnico.</li>
+              <li>Salidos los equipos no se admiten cambios ni reclamos.</li>
+              <li>Por favor revise sus equipos antes de retirarlos.</li>
+            </ul>
+
+            <div class="signature-section">
+              <div class="signature-block">
+                <div class="signature-line"></div>
+                <p class="signature-label">Firma autorizada</p>
+              </div>
+              <div class="signature-block">
+                <div class="signature-line"></div>
+                <p class="signature-label">Firma del cliente</p>
+              </div>
+            </div>
           </div>
         </body>
       </html>`
 
-    const printWindow = window.open('', '_blank', 'width=800,height=900')
+    const printWindow = window.open('', '_blank', 'width=900,height=1000')
     if (!printWindow) return
 
     printWindow.document.write(html)
     printWindow.document.close()
     printWindow.focus()
-    printWindow.print()
+    window.setTimeout(() => printWindow.print(), 250)
   }
 
   async function saveOrder(event) {
@@ -272,7 +319,7 @@ function WorkOrders() {
               />
             </label>
             <label>
-              Observaciones
+              IMEI / Observaciones
               <textarea
                 placeholder="Condicion del equipo, golpes, humedad u otros detalles"
                 value={form.notes}
@@ -315,6 +362,7 @@ function WorkOrders() {
                 value={form.balance}
                 onChange={(event) => updateField('balance', event.target.value)}
               />
+              <span className="field-help">Se actualiza automáticamente al cambiar costo o abono.</span>
             </label>
           </fieldset>
         </div>
@@ -339,3 +387,4 @@ function WorkOrders() {
 }
 
 export default WorkOrders
+

@@ -35,6 +35,17 @@ async function ensureCashClosingSchema() {
     ALTER TABLE cash_closings
     ALTER COLUMN opening_cash SET DEFAULT 55;
   `);
+
+  await query(`
+    ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+  `);
+
+  await query(`
+    UPDATE work_orders
+    SET delivered_at = updated_at
+    WHERE status = 'Entregado' AND delivered_at IS NULL;
+  `);
 }
 
 function normalizeCashClose(row) {
@@ -61,11 +72,12 @@ async function getTodaySummary(authUser = null) {
   const activeSession = await query(
     `SELECT id, date, "user", opening_cash, counted_cash, opened_at, closed_at
      FROM cash_closings
-     WHERE "user" = $1 AND closed_at IS NULL
+     WHERE closed_at IS NULL
      ORDER BY opened_at DESC, id DESC
      LIMIT 1`,
-    [userName],
   );
+
+  const closedSessionToday = await getLatestClosedSessionToday(today);
 
   // If there is an active session, compute totals starting from the session open time.
   let salesTotal = 0;
@@ -76,9 +88,15 @@ async function getTodaySummary(authUser = null) {
       `SELECT
          COALESCE((SELECT SUM(total) FROM sales WHERE date >= $1), 0) AS sales_total,
          COALESCE((
-           SELECT SUM(service_cost)
+           SELECT SUM(downpayment)
            FROM work_orders
-           WHERE status IN ('Reparado', 'Entregado') AND updated_at >= $1
+           WHERE created_at >= $1
+         ), 0)
+         +
+         COALESCE((
+           SELECT SUM(balance)
+           FROM work_orders
+           WHERE status = 'Entregado' AND delivered_at >= $1
          ), 0) AS service_total
       `,
       [start.toISOString()],
@@ -86,6 +104,9 @@ async function getTodaySummary(authUser = null) {
 
     salesTotal = Number(result.rows[0].sales_total);
     serviceTotal = Number(result.rows[0].service_total);
+  } else if (closedSessionToday) {
+    salesTotal = Number(closedSessionToday.sales_total);
+    serviceTotal = Number(closedSessionToday.service_total);
   } else {
     // No active session: treat as a fresh state for a new jornada — show zeros
     // so the UI starts with an empty session. Historical totals remain available
@@ -107,6 +128,19 @@ async function getTodaySummary(authUser = null) {
       countedCash: Number(row.counted_cash ?? initialCountedCash),
       openedAt: row.opened_at,
       closedAt: row.closed_at,
+    };
+  }
+
+  if (closedSessionToday) {
+    return {
+      date: closedSessionToday.date || today,
+      user: closedSessionToday.user || userName,
+      salesTotal,
+      serviceTotal,
+      openingCash: resolveOpeningCash(closedSessionToday.opening_cash),
+      countedCash: Number(closedSessionToday.counted_cash ?? initialCountedCash),
+      openedAt: closedSessionToday.opened_at,
+      closedAt: closedSessionToday.closed_at,
     };
   }
 
@@ -132,14 +166,27 @@ async function nextCashCloseId() {
   return `CC-${String(result.rows[0].next_id).padStart(4, '0')}`;
 }
 
-async function getActiveSession(userName) {
+async function getActiveSession() {
   const result = await query(
     `SELECT id, date, "user", opening_cash, counted_cash, opened_at, closed_at
      FROM cash_closings
-     WHERE "user" = $1 AND closed_at IS NULL
+     WHERE closed_at IS NULL
      ORDER BY opened_at DESC, id DESC
      LIMIT 1`,
-    [userName],
+  );
+
+  return result.rowCount ? result.rows[0] : null;
+}
+
+async function getLatestClosedSessionToday(today) {
+  const result = await query(
+    `SELECT id, date, "user", sales_total, service_total, opening_cash, counted_cash, difference, opened_at, closed_at
+     FROM cash_closings
+     WHERE date = $1
+       AND closed_at IS NOT NULL
+     ORDER BY closed_at DESC, id DESC
+     LIMIT 1`,
+    [today],
   );
 
   return result.rowCount ? result.rows[0] : null;
@@ -148,14 +195,24 @@ async function getActiveSession(userName) {
 async function create(payload, authUser = null) {
   await ensureCashClosingSchema();
   const summary = await getTodaySummary(authUser);
+  const userName = payload.user || authUser?.name || summary.user || 'Tecnico';
+  const today = new Date().toLocaleDateString('es-EC');
+  const latestClosedToday = await getLatestClosedSessionToday(today);
   const openingCash = resolveOpeningCash(payload.openingCash ?? summary.openingCash);
   const countedCash = Number(payload.countedCash ?? summary.countedCash ?? 0);
   const difference = countedCash - openingCash - summary.salesTotal - summary.serviceTotal;
   const openedAt = payload.openedAt || summary.openedAt || new Date().toISOString();
   const closedAt = payload.closedAt ?? null;
-  const userName = payload.user || authUser?.name || summary.user || 'Tecnico';
 
-  let activeSession = await getActiveSession(userName);
+  let activeSession = await getActiveSession();
+
+  if (payload.closedAt && !activeSession && latestClosedToday) {
+    return normalizeCashClose(latestClosedToday);
+  }
+
+  if (payload.startNewSession && !activeSession && latestClosedToday) {
+    return normalizeCashClose(latestClosedToday);
+  }
 
   if (payload.startNewSession && activeSession) {
     const previousOpeningCash = resolveOpeningCash(activeSession.opening_cash);
@@ -348,25 +405,35 @@ async function getReportDetails(report) {
   );
 
   const workOrderParams = [];
-  const workOrderConditions = [];
+  const downpaymentConditions = ['downpayment > 0'];
+  const balanceConditions = ["status = 'Entregado'", 'balance > 0'];
 
   if (start) {
     workOrderParams.push(start.toISOString());
-    workOrderConditions.push(`updated_at >= $${workOrderParams.length}`);
+    downpaymentConditions.push(`created_at >= $${workOrderParams.length}`);
+    balanceConditions.push(`delivered_at >= $${workOrderParams.length}`);
   }
 
   if (end) {
     workOrderParams.push(end.toISOString());
-    workOrderConditions.push(`updated_at <= $${workOrderParams.length}`);
+    downpaymentConditions.push(`created_at <= $${workOrderParams.length}`);
+    balanceConditions.push(`delivered_at <= $${workOrderParams.length}`);
   }
 
-  const workOrderWhere = workOrderConditions.length ? `WHERE ${workOrderConditions.join(' AND ')}` : '';
+  const downpaymentWhere = `WHERE ${downpaymentConditions.join(' AND ')}`;
+  const balanceWhere = `WHERE ${balanceConditions.join(' AND ')}`;
 
   const workOrdersResult = await query(
-    `SELECT id, client, device, status, service_cost, repair_description, updated_at
+    `SELECT id, client, device, status, downpayment AS amount, 'Abono' AS payment_type,
+            repair_description, created_at AS payment_date
      FROM work_orders
-     ${workOrderWhere}
-     ORDER BY updated_at DESC`,
+     ${downpaymentWhere}
+     UNION ALL
+     SELECT id, client, device, status, balance AS amount, 'Saldo' AS payment_type,
+            repair_description, delivered_at AS payment_date
+     FROM work_orders
+     ${balanceWhere}
+     ORDER BY payment_date DESC`,
     workOrderParams,
   );
 
@@ -384,9 +451,10 @@ async function getReportDetails(report) {
       client: row.client,
       device: row.device,
       status: row.status,
-      serviceCost: Number(row.service_cost),
+      serviceCost: Number(row.amount),
+      paymentType: row.payment_type,
       repairDescription: row.repair_description,
-      updatedAt: row.updated_at,
+      updatedAt: row.payment_date,
     })),
   };
 }

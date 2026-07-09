@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import useApiResource from '../hooks/useApiResource'
@@ -33,12 +33,14 @@ function OrderHistory() {
 
   useEffect(() => {
     if (!selectedOrderId && filteredOrders.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOrderId(filteredOrders[0].id)
     }
   }, [filteredOrders, selectedOrderId])
 
   useEffect(() => {
     if (selectedOrder) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOrderForm({
         status: selectedOrder.status,
         serviceCost: selectedOrder.serviceCost || 0,

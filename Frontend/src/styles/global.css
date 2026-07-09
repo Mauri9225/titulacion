@@ -810,6 +810,33 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.cash-summary p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.cash-summary input {
+  width: auto;
+  min-width: 140px;
+  min-height: 36px;
+  border: 1px solid #d8e1ed;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #172033;
+  background: #ffffff;
+  outline: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.cash-summary input:focus {
+  border-color: #0d6fe8;
+  box-shadow: 0 0 0 3px rgba(13, 111, 232, 0.1);
+}
+
 .cash-summary .difference {
   color: #008a3d;
   font-size: 18px;

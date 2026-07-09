@@ -6,9 +6,11 @@ import useApiResource from '../hooks/useApiResource'
 import { api } from '../services/api'
 
 function DeliveredEquipmentHistory() {
+  const INITIAL_VISIBLE_ROWS = 5
   const [search, setSearch] = useState('')
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isListModalOpen, setIsListModalOpen] = useState(false)
 
   const { data: workOrders, error, loading, reload } = useApiResource(
     () => api.workOrders.list(search, 'Entregado'),
@@ -16,6 +18,11 @@ function DeliveredEquipmentHistory() {
   )
 
   const filteredOrders = useMemo(() => workOrders, [workOrders])
+  const visibleOrders = useMemo(
+    () => filteredOrders.slice(0, INITIAL_VISIBLE_ROWS),
+    [filteredOrders],
+  )
+  const hasMoreOrders = filteredOrders.length > INITIAL_VISIBLE_ROWS
   const selectedOrder = useMemo(
     () => filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0],
     [filteredOrders, selectedOrderId],
@@ -140,6 +147,74 @@ function DeliveredEquipmentHistory() {
           </div>
         ) : null}
 
+        {isListModalOpen ? (
+          <div
+            className="modal-overlay"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setIsListModalOpen(false)
+              }
+            }}
+          >
+            <div className="modal-content" style={{ maxWidth: '1100px', width: '100%' }}>
+              <div className="modal-header">
+                <div>
+                  <h2>Historial completo de equipos entregados</h2>
+                  <span>Listado general para consulta rápida</span>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setIsListModalOpen(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Orden</th>
+                      <th>Fecha ingreso</th>
+                      <th>Cliente</th>
+                      <th>Telefono</th>
+                      <th>Fecha entrega</th>
+                      <th>Equipo</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.map((order) => (
+                      <tr
+                        key={`modal-${order.id}`}
+                        onClick={() => {
+                          setSelectedOrderId(order.id)
+                          setIsListModalOpen(false)
+                          setIsModalOpen(true)
+                        }}
+                        className={order.id === selectedOrderId ? 'selected-row' : ''}
+                      >
+                        <td>{order.id}</td>
+                        <td>{order.date}</td>
+                        <td>{order.client}</td>
+                        <td>{order.phone}</td>
+                        <td>{order.deliveryDate || 'Pendiente'}</td>
+                        <td>{order.device}</td>
+                        <td>
+                          <span className={`status ${order.status.toLowerCase().replace(/ /g, '-')}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <table className="data-table">
           <thead>
             <tr>
@@ -153,7 +228,7 @@ function DeliveredEquipmentHistory() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map((order) => (
+            {visibleOrders.map((order) => (
               <tr
                 key={order.id}
                 onClick={() => {
@@ -177,6 +252,18 @@ function DeliveredEquipmentHistory() {
             ))}
           </tbody>
         </table>
+
+        {hasMoreOrders ? (
+          <div className="action-row" style={{ justifyContent: 'center', marginTop: '12px' }}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setIsListModalOpen(true)}
+            >
+              {`Ver mas (${filteredOrders.length})`}
+            </button>
+          </div>
+        ) : null}
       </section>
     </section>
   )

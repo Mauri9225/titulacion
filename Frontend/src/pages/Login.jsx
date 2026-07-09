@@ -1,4 +1,4 @@
-import { Eye, Lock, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../assets/android.png'
@@ -14,6 +14,7 @@ function Login() {
   })
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -64,7 +65,7 @@ function Login() {
           <label className="input-control">
             <Lock size={18} />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Contrasena"
               value={form.password}
               onChange={(event) =>
@@ -72,7 +73,21 @@ function Login() {
               }
               required
             />
-            <Eye size={18} />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                display: 'grid',
+                placeItems: 'center',
+                color: '#69788e',
+              }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </label>
           <label className="input-control">
             <User size={18} />

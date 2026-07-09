@@ -27,12 +27,14 @@ function OrderManagement() {
 
   useEffect(() => {
     if (!selectedOrderId && filteredOrders.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOrderId(filteredOrders[0].id)
     }
   }, [filteredOrders, selectedOrderId])
 
   useEffect(() => {
     if (selectedOrder) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOrderForm({
         status: selectedOrder.status,
         serviceCost: selectedOrder.serviceCost || 0,

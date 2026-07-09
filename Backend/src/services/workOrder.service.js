@@ -17,10 +17,36 @@ function normalizeOrder(row) {
     downpayment: Number(row.downpayment),
     balance: Number(row.balance),
     deliveryDate: row.delivery_date,
+    deliveredAt: row.delivered_at,
+    createdAt: row.created_at,
     status: row.status,
     date: row.date,
     technician: row.technician,
   };
+}
+
+async function ensureWorkOrderSchema() {
+  await query(`
+    ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+  `);
+
+  await query(`
+    UPDATE work_orders AS w
+    SET id = REGEXP_REPLACE(w.id, '^#', '')
+    WHERE w.id ~ '^#[0-9]+$'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM work_orders AS existing
+        WHERE existing.id = REGEXP_REPLACE(w.id, '^#', '')
+      );
+  `);
+
+  await query(`
+    UPDATE work_orders
+    SET delivered_at = updated_at
+    WHERE status = 'Entregado' AND delivered_at IS NULL;
+  `);
 }
 
 async function list(filters = {}) {
@@ -58,21 +84,51 @@ async function list(filters = {}) {
 }
 
 async function findById(id) {
-  const result = await query('SELECT * FROM work_orders WHERE id = $1', [id]);
+  const normalizedId = String(id || '').replace(/^#/, '');
+  const result = await query(
+    `SELECT *
+     FROM work_orders
+     WHERE id = $1 OR id = $2
+     ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [normalizedId, `#${normalizedId}`],
+  );
   return result.rowCount ? normalizeOrder(result.rows[0]) : null;
 }
 
 async function nextWorkOrderId() {
   const result = await query(`
-    SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 2) AS INTEGER)), 0) + 1 AS next_id
+    SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(id, '^#', '') AS INTEGER)), 0) + 1 AS next_id
     FROM work_orders
-    WHERE id ~ '^#[0-9]+$'
+    WHERE REGEXP_REPLACE(id, '^#', '') ~ '^[0-9]+$'
   `);
 
-  return `#${String(result.rows[0].next_id).padStart(4, '0')}`;
+  return String(result.rows[0].next_id).padStart(4, '0');
+}
+
+function createValidationError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
+function validateWorkOrder(payload) {
+  const document = String(payload.document || '');
+  const phone = String(payload.phone || '');
+
+  if (!/^\d{1,13}$/.test(document)) {
+    throw createValidationError('La cedula/RUC debe tener solo numeros y maximo 13 digitos.');
+  }
+
+  if (!/^\d{1,10}$/.test(phone)) {
+    throw createValidationError('El telefono debe tener solo numeros y maximo 10 digitos.');
+  }
 }
 
 async function create(payload) {
+  await ensureWorkOrderSchema();
+  validateWorkOrder(payload);
+
   const id = await nextWorkOrderId();
   const date = new Date().toLocaleDateString('es-EC');
   const result = await query(
@@ -109,13 +165,28 @@ async function create(payload) {
 }
 
 async function updateStatus(id, payload) {
-  const current = await query('SELECT * FROM work_orders WHERE id = $1', [id]);
+  await ensureWorkOrderSchema();
+
+  const normalizedId = String(id || '').replace(/^#/, '');
+  const current = await query(
+    `SELECT *
+     FROM work_orders
+     WHERE id = $1 OR id = $2
+     ORDER BY CASE WHEN id = $1 THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [normalizedId, `#${normalizedId}`],
+  );
 
   if (!current.rowCount) {
     return null;
   }
 
   const order = current.rows[0];
+  const nextStatus = payload.status || order.status;
+  const deliveredAt =
+    nextStatus === 'Entregado' && !order.delivered_at
+      ? new Date().toISOString()
+      : order.delivered_at;
   const result = await query(
     `UPDATE work_orders
      SET status = $2,
@@ -124,12 +195,13 @@ async function updateStatus(id, payload) {
          balance = $5,
          delivery_date = $6,
          repair_description = $7,
+         delivered_at = $8,
          updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
     [
       id,
-      payload.status || order.status,
+      nextStatus,
       payload.serviceCost === undefined ? order.service_cost : Number(payload.serviceCost),
       payload.downpayment === undefined ? order.downpayment : Number(payload.downpayment),
       payload.balance === undefined ? order.balance : Number(payload.balance),
@@ -137,6 +209,7 @@ async function updateStatus(id, payload) {
       payload.repairDescription === undefined
         ? order.repair_description
         : payload.repairDescription || '',
+      deliveredAt,
     ],
   );
 
