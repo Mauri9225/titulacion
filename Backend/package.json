@@ -8,7 +8,13 @@
     "dev": "nodemon server.js",
     "start": "node server.js"
   },
-  "keywords": [],
+   "engines": {
+    "node": "22.x"
+  },
+  "keywords": ["electri-incom",
+    "express",
+    "postgresql",
+    "api-rest"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
