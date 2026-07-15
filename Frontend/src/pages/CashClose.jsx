@@ -1,4 +1,4 @@
-import { Lock, Eye, X } from 'lucide-react'
+import { Lock, Eye, Unlock, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../components/ui/PageHeader'
 import useApiResource from '../hooks/useApiResource'
@@ -50,8 +50,10 @@ function CashClose() {
   const [salesDetails, setSalesDetails] = useState([])
   const [servicesDetails, setServicesDetails] = useState([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [savingCash, setSavingCash] = useState(false)
   const isAdmin = user?.role === 'admin'
   const isClosed = Boolean(cashSummary.closedAt)
+  const hasOpenCash = Boolean(cashSummary.openedAt && !isClosed)
   const displayUser = user?.name || cashSummary.user || 'Tecnico'
   const currentDate = useMemo(() => new Date().toLocaleDateString('es-EC'), [])
   const visibleReports = reports.slice(0, 5)
@@ -110,24 +112,6 @@ function CashClose() {
     setSalesDetailsOpen(false)
     setServicesDetailsOpen(false)
     
-    // If the app just started a fresh session on login, show zeroed totals immediately
-    try {
-      const fresh = localStorage.getItem('electriIncomFreshSession')
-      if (fresh) {
-        setData((prev) => ({
-          ...prev,
-          salesTotal: 0,
-          serviceTotal: 0,
-          countedCash: 0,
-          openingCash: 55,
-          openedAt: new Date().toISOString(),
-          closedAt: null,
-        }))
-        localStorage.removeItem('electriIncomFreshSession')
-      }
-    } catch {
-      // ignore
-    }
   }, [user?.id, setData])
 
   useEffect(() => {
@@ -165,17 +149,42 @@ function CashClose() {
   }, [user?.id]) // Solo cuando el ID del usuario cambia
 
   async function closeCash() {
-    if (isClosed) return
+    if (isClosed || savingCash) return
 
-    await api.cashClose.close({
-      openingCash,
-      countedCash,
-      openedAt: cashSummary.openedAt || new Date().toISOString(),
-      closedAt: new Date().toISOString(),
-      user: user?.name || cashSummary.user,
-    })
-    await loadReports()
-    await reload()
+    setSavingCash(true)
+    try {
+      await api.cashClose.close({
+        openingCash,
+        countedCash,
+        openedAt: cashSummary.openedAt || new Date().toISOString(),
+        closedAt: new Date().toISOString(),
+        user: user?.name || cashSummary.user,
+      })
+      await loadReports()
+      await reload()
+    } finally {
+      setSavingCash(false)
+    }
+  }
+
+  async function openCash() {
+    if (hasOpenCash || savingCash) return
+
+    setSavingCash(true)
+    try {
+      await api.cashClose.open({
+        ...(isClosed ? { reopen: true } : {
+          startNewSession: true,
+          openingCash,
+          countedCash: 0,
+          openedAt: new Date().toISOString(),
+        }),
+        user: user?.name || cashSummary.user,
+      })
+      await reload()
+    } finally {
+      setSavingCash(false)
+    }
   }
 
   function openReportDetail(report) {
@@ -378,7 +387,7 @@ function CashClose() {
               step="0.01"
               placeholder="0.00"
               value={openingCash || ''}
-              disabled={isClosed}
+              disabled={!hasOpenCash}
               onChange={(event) => {
                 const val = event.target.value.replace(',', '.')
                 const num = parseFloat(val)
@@ -394,7 +403,7 @@ function CashClose() {
               step="0.01"
               placeholder="0.00"
               value={countedCash || ''}
-              disabled={isClosed}
+              disabled={!hasOpenCash}
               onChange={(event) => {
                 const val = event.target.value.replace(',', '.')
                 const num = parseFloat(val)
@@ -407,10 +416,16 @@ function CashClose() {
           </p>
         </div>
 
-        <button className="success-button full" type="button" onClick={closeCash} disabled={isClosed}>
-          <Lock size={17} />
-          {isClosed ? 'Jornada cerrada' : 'Cerrar caja'}
-        </button>
+        <div className="action-row">
+          <button className="secondary-button" type="button" onClick={openCash} disabled={hasOpenCash || savingCash}>
+            <Unlock size={17} />
+            Aperturar caja
+          </button>
+          <button className="success-button" type="button" onClick={closeCash} disabled={!hasOpenCash || savingCash}>
+            <Lock size={17} />
+            Cerrar caja
+          </button>
+        </div>
       </section>
 
       {isAdmin && showAdminDailyReport ? (
