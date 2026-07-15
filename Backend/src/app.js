@@ -6,12 +6,21 @@ const routes = require('./routes');
 
 const app = express();
 const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',')
+  ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
   : ['http://127.0.0.1:5173', 'http://localhost:5173'];
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      // Permite herramientas como Postman y peticiones sin Origin
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Origen no permitido por CORS'));
+    },
   }),
 );
 app.use(express.json());
