@@ -30,7 +30,7 @@ function App() {
         <Route path="caja" element={<CashClose />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 }
