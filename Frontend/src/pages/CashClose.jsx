@@ -149,11 +149,8 @@ function CashClose() {
   }, [user?.id]) // Solo cuando el ID del usuario cambia
 
   async function closeCash() {
-<<<<<<< HEAD
     if (isClosed || savingCash) return
-=======
     if (!hasOpenCash) return
->>>>>>> mauricio
 
     setSavingCash(true)
     try {
