@@ -444,6 +444,30 @@ p {
   gap: 10px;
 }
 
+.pagination,
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination {
+  justify-content: space-between;
+  padding-top: 14px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.pagination-controls {
+  color: #172033;
+  font-weight: 700;
+}
+
+.pagination-controls .secondary-button {
+  min-width: 38px;
+  padding: 8px;
+}
+
 .compact-table article {
   display: grid;
   grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr) auto;

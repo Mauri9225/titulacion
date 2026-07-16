@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Search, ShoppingCart, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, ShoppingCart, X } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import useApiResource from '../hooks/useApiResource'
 import { api } from '../services/api'
+
+const PRODUCTS_PER_PAGE = 10
 
 function SalesPOS() {
   const { data: products, error, loading, reload } = useApiResource(
@@ -11,6 +13,7 @@ function SalesPOS() {
   )
   const [ticketItems, setTicketItems] = useState([])
   const [search, setSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [rechargeAmount, setRechargeAmount] = useState(35)
 
   const subtotal = ticketItems.reduce((sum, item) => {
@@ -33,6 +36,10 @@ function SalesPOS() {
       ),
     [products, search],
   )
+  const totalPages = Math.max(1, Math.ceil(availableProducts.length / PRODUCTS_PER_PAGE))
+  const visiblePage = Math.min(currentPage, totalPages)
+  const firstProductIndex = (visiblePage - 1) * PRODUCTS_PER_PAGE
+  const visibleProducts = availableProducts.slice(firstProductIndex, firstProductIndex + PRODUCTS_PER_PAGE)
 
   function addToTicket(product) {
     setTicketItems((currentItems) => {
@@ -156,13 +163,16 @@ function SalesPOS() {
                 type="search"
                 placeholder="Buscar producto..."
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setCurrentPage(1)
+                }}
               />
             </label>
           </div>
 
           <div className="product-list">
-            {availableProducts.map((product) => (
+            {visibleProducts.map((product) => (
               <button key={product.id} type="button" onClick={() => addToTicket(product)}>
                 <span>
                   {product.name} <small>({product.stock} disponibles)</small>
@@ -171,6 +181,38 @@ function SalesPOS() {
               </button>
             ))}
           </div>
+          {availableProducts.length > PRODUCTS_PER_PAGE ? (
+            <div className="pagination" aria-label="Paginacion de productos">
+              <span>
+                Mostrando {firstProductIndex + 1}-{Math.min(firstProductIndex + PRODUCTS_PER_PAGE, availableProducts.length)} de {availableProducts.length}
+              </span>
+              <div className="pagination-controls">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  aria-label="Pagina anterior"
+                  title="Pagina anterior"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={visiblePage === 1}
+                >
+                  <ChevronLeft size={17} />
+                </button>
+                <span>
+                  Pagina {visiblePage} de {totalPages}
+                </span>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  aria-label="Pagina siguiente"
+                  title="Pagina siguiente"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={visiblePage === totalPages}
+                >
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="panel">

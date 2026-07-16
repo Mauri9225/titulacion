@@ -1,8 +1,10 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import PageHeader from '../components/ui/PageHeader'
 import useApiResource from '../hooks/useApiResource'
 import { api } from '../services/api'
+
+const PRODUCTS_PER_PAGE = 10
 
 function Inventory() {
   const { data: products, error, loading, reload } = useApiResource(
@@ -11,6 +13,7 @@ function Inventory() {
   )
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingProductId, setEditingProductId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [productForm, setProductForm] = useState({
     name: '',
     category: '',
@@ -19,6 +22,10 @@ function Inventory() {
     price: 0,
   })
   const isProductModalOpen = isAddModalOpen || Boolean(editingProductId)
+  const totalPages = Math.max(1, Math.ceil(products.length / PRODUCTS_PER_PAGE))
+  const visiblePage = Math.min(currentPage, totalPages)
+  const firstProductIndex = (visiblePage - 1) * PRODUCTS_PER_PAGE
+  const visibleProducts = products.slice(firstProductIndex, firstProductIndex + PRODUCTS_PER_PAGE)
 
   function resetProductForm() {
     setProductForm({
@@ -195,7 +202,7 @@ function Inventory() {
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {visibleProducts.map((product) => (
               <tr key={product.id}>
                 <td>{product.id}</td>
                 <td>{product.name}</td>
@@ -229,6 +236,38 @@ function Inventory() {
             ))}
           </tbody>
         </table>
+        {products.length > PRODUCTS_PER_PAGE ? (
+          <div className="pagination" aria-label="Paginacion de productos">
+            <span>
+              Mostrando {firstProductIndex + 1}-{Math.min(firstProductIndex + PRODUCTS_PER_PAGE, products.length)} de {products.length}
+            </span>
+            <div className="pagination-controls">
+              <button
+                className="secondary-button"
+                type="button"
+                aria-label="Pagina anterior"
+                title="Pagina anterior"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={visiblePage === 1}
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <span>
+                Pagina {visiblePage} de {totalPages}
+              </span>
+              <button
+                className="secondary-button"
+                type="button"
+                aria-label="Pagina siguiente"
+                title="Pagina siguiente"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={visiblePage === totalPages}
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </section>
   )
