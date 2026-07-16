@@ -206,12 +206,8 @@ async function create(payload, authUser = null) {
 
   let activeSession = await getActiveSession();
 
-<<<<<<< HEAD
   // Reopen the latest closed jornada so a cashier can correct a typed amount
   // before closing the same record again. Totals are recalculated on close.
-=======
-  // Reopen the latest closed jornada to correct a typed amount before closing it again.
->>>>>>> mauricio
   if (payload.reopen && !activeSession && latestClosedToday) {
     const result = await query(
       `UPDATE cash_closings
