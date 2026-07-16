@@ -1,5 +1,4 @@
 const app = require('./src/app');
-
 const { checkConnection } = require('./src/config/database');
 
 const PORT = process.env.PORT || 3000;
@@ -30,7 +29,6 @@ async function startServer() {
 }
 
 startServer();
-
 const { startCashCloseScheduler } = require('./src/services/cashCloseScheduler.service');
 
 const PORT = process.env.PORT || 3000;
