@@ -433,19 +433,16 @@ function CashClose() {
         </div>
 
         <div className="action-row">
-<<<<<<< HEAD
           <button className="secondary-button" type="button" onClick={openCash} disabled={hasOpenCash || savingCash}>
             <Unlock size={17} />
             Aperturar caja
           </button>
           <button className="success-button" type="button" onClick={closeCash} disabled={!hasOpenCash || savingCash}>
-=======
           <button className="secondary-button" type="button" onClick={openCash} disabled={hasOpenCash}>
             <Unlock size={17} />
             Aperturar caja
           </button>
           <button className="success-button" type="button" onClick={closeCash} disabled={!hasOpenCash}>
->>>>>>> mauricio
             <Lock size={17} />
             Cerrar caja
           </button>
