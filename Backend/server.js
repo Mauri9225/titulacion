@@ -1,5 +1,6 @@
 const app = require('./src/app');
 const { checkConnection } = require('./src/config/database');
+const { startCashCloseScheduler } = require('./src/services/cashCloseScheduler.service');
 
 const PORT = process.env.PORT || 3000;
 
@@ -14,10 +15,14 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log('====================================');
-      console.log(`🚀 Electri-Incom iniciado`);
+      console.log('🚀 Electri-Incom iniciado');
       console.log(`🌐 Puerto: ${PORT}`);
       console.log('====================================');
+
+      // Iniciar el programador de cierre de caja
+      startCashCloseScheduler();
     });
+
   } catch (error) {
     console.error('====================================');
     console.error('❌ Error al conectar con PostgreSQL');
@@ -29,12 +34,3 @@ async function startServer() {
 }
 
 startServer();
-const { startCashCloseScheduler } = require('./src/services/cashCloseScheduler.service');
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  startCashCloseScheduler();
-});
-
