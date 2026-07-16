@@ -149,7 +149,11 @@ function CashClose() {
   }, [user?.id]) // Solo cuando el ID del usuario cambia
 
   async function closeCash() {
+<<<<<<< HEAD
     if (isClosed || savingCash) return
+=======
+    if (!hasOpenCash) return
+>>>>>>> mauricio
 
     setSavingCash(true)
     try {
@@ -185,6 +189,21 @@ function CashClose() {
     } finally {
       setSavingCash(false)
     }
+  }
+
+  async function openCash() {
+    if (hasOpenCash) return
+
+    await api.cashClose.open({
+      ...(isClosed ? { reopen: true } : {
+        startNewSession: true,
+        openingCash,
+        countedCash: 0,
+        openedAt: new Date().toISOString(),
+      }),
+      user: user?.name || cashSummary.user,
+    })
+    await reload()
   }
 
   function openReportDetail(report) {
@@ -417,11 +436,19 @@ function CashClose() {
         </div>
 
         <div className="action-row">
+<<<<<<< HEAD
           <button className="secondary-button" type="button" onClick={openCash} disabled={hasOpenCash || savingCash}>
             <Unlock size={17} />
             Aperturar caja
           </button>
           <button className="success-button" type="button" onClick={closeCash} disabled={!hasOpenCash || savingCash}>
+=======
+          <button className="secondary-button" type="button" onClick={openCash} disabled={hasOpenCash}>
+            <Unlock size={17} />
+            Aperturar caja
+          </button>
+          <button className="success-button" type="button" onClick={closeCash} disabled={!hasOpenCash}>
+>>>>>>> mauricio
             <Lock size={17} />
             Cerrar caja
           </button>

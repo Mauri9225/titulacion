@@ -249,8 +249,11 @@ function WorkOrders() {
               <div className="inline-input">
                 <input
                   placeholder="Ej. 1726000001"
+                  inputMode="numeric"
+                  maxLength={13}
+                  pattern="[0-9]*"
                   value={form.document}
-                  onChange={(event) => updateField('document', event.target.value)}
+                  onChange={(event) => updateField('document', event.target.value.replace(/\D/g, '').slice(0, 13))}
                 />
                 <button
                   className="primary-button"
@@ -273,11 +276,14 @@ function WorkOrders() {
             </label>
             <label>
               Telefono
-              <input
-                placeholder="Ej. 0998765432"
-                type="tel"
-                value={form.phone}
-                onChange={(event) => updateField('phone', event.target.value)}
+                <input
+                  placeholder="Ej. 0998765432"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="[0-9]*"
+                  value={form.phone}
+                  onChange={(event) => updateField('phone', event.target.value.replace(/\D/g, '').slice(0, 10))}
               />
             </label>
           </fieldset>
@@ -387,4 +393,3 @@ function WorkOrders() {
 }
 
 export default WorkOrders
-
