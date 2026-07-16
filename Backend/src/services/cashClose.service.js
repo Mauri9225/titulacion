@@ -206,6 +206,21 @@ async function create(payload, authUser = null) {
 
   let activeSession = await getActiveSession();
 
+  // Reopen the latest closed jornada to correct a typed amount before closing it again.
+  if (payload.reopen && !activeSession && latestClosedToday) {
+    const result = await query(
+      `UPDATE cash_closings
+       SET "user" = $2,
+           closed_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, date, "user", sales_total, service_total, opening_cash, counted_cash, difference, opened_at, closed_at`,
+      [latestClosedToday.id, userName],
+    );
+
+    return normalizeCashClose(result.rows[0]);
+  }
+
   if (payload.closedAt && !activeSession && latestClosedToday) {
     return normalizeCashClose(latestClosedToday);
   }
