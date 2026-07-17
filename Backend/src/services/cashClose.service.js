@@ -94,7 +94,12 @@ async function getTodaySummary(authUser = null) {
          ), 0)
          +
          COALESCE((
-           SELECT SUM(balance)
+           SELECT SUM(
+             CASE
+               WHEN balance > 0 THEN balance
+               ELSE GREATEST(service_cost - downpayment, 0)
+             END
+           )
            FROM work_orders
            WHERE status = 'Entregado' AND delivered_at >= $1
          ), 0) AS service_total
@@ -421,7 +426,10 @@ async function getReportDetails(report) {
 
   const workOrderParams = [];
   const downpaymentConditions = ['downpayment > 0'];
-  const balanceConditions = ["status = 'Entregado'", 'balance > 0'];
+  const balanceConditions = [
+    "status = 'Entregado'",
+    '(balance > 0 OR service_cost > downpayment)',
+  ];
 
   if (start) {
     workOrderParams.push(start.toISOString());
@@ -444,7 +452,12 @@ async function getReportDetails(report) {
      FROM work_orders
      ${downpaymentWhere}
      UNION ALL
-     SELECT id, client, device, status, balance AS amount, 'Saldo' AS payment_type,
+     SELECT id, client, device, status,
+            CASE
+              WHEN balance > 0 THEN balance
+              ELSE GREATEST(service_cost - downpayment, 0)
+            END AS amount,
+            'Saldo' AS payment_type,
             repair_description, delivered_at AS payment_date
      FROM work_orders
      ${balanceWhere}

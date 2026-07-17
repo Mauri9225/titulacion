@@ -18,6 +18,14 @@ const initialForm = {
   deliveryDate: '',
 }
 
+function calculateBalance(serviceCost, downpayment) {
+  if (serviceCost === '' && downpayment === '') return ''
+
+  const cost = Number(serviceCost) || 0
+  const payment = Number(downpayment) || 0
+  return String(Math.max(cost - payment, 0))
+}
+
 function WorkOrders() {
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
@@ -27,7 +35,15 @@ function WorkOrders() {
   const [isSearchingClient, setIsSearchingClient] = useState(false)
 
   function updateField(field, value) {
-    setForm((currentForm) => ({ ...currentForm, [field]: value }))
+    setForm((currentForm) => {
+      const nextForm = { ...currentForm, [field]: value }
+
+      if (field === 'serviceCost' || field === 'downpayment') {
+        nextForm.balance = calculateBalance(nextForm.serviceCost, nextForm.downpayment)
+      }
+
+      return nextForm
+    })
     setError('')
     setMessage('')
   }
@@ -366,7 +382,7 @@ function WorkOrders() {
                 step="0.01"
                 placeholder="Ej. 25.00"
                 value={form.balance}
-                onChange={(event) => updateField('balance', event.target.value)}
+                readOnly
               />
               <span className="field-help">Se actualiza automáticamente al cambiar costo o abono.</span>
             </label>

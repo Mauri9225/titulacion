@@ -41,7 +41,12 @@ async function getSummary() {
           ), 0)
           +
           COALESCE((
-            SELECT SUM(balance)
+            SELECT SUM(
+              CASE
+                WHEN balance > 0 THEN balance
+                ELSE GREATEST(service_cost - downpayment, 0)
+              END
+            )
             FROM work_orders
             WHERE status = 'Entregado' AND delivered_at::date = CURRENT_DATE
           ), 0)
@@ -58,9 +63,15 @@ async function getSummary() {
         FROM work_orders
         WHERE downpayment > 0
         UNION ALL
-        SELECT delivered_at::date AS income_date, balance AS amount
+        SELECT delivered_at::date AS income_date,
+               CASE
+                 WHEN balance > 0 THEN balance
+                 ELSE GREATEST(service_cost - downpayment, 0)
+               END AS amount
         FROM work_orders
-        WHERE status = 'Entregado' AND balance > 0 AND delivered_at IS NOT NULL
+        WHERE status = 'Entregado'
+          AND (balance > 0 OR service_cost > downpayment)
+          AND delivered_at IS NOT NULL
       ) income ON income.income_date = day::date
       GROUP BY day
       ORDER BY day
