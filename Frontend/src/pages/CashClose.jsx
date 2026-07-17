@@ -17,6 +17,29 @@ function money(value) {
   return `$ ${value.toFixed(2)}`
 }
 
+// El abono entra a caja al recibir el equipo y el saldo únicamente al entregarlo.
+function getServicePaymentsForSession(service, sessionStart) {
+  const createdAt = new Date(service.createdAt).getTime()
+  const deliveredAt = service.deliveredAt ? new Date(service.deliveredAt).getTime() : null
+  const downpayment = Number(service.downpayment || 0)
+  const registeredBalance = Number(service.balance || 0)
+  const balance = registeredBalance > 0
+    ? registeredBalance
+    : Math.max(Number(service.serviceCost || 0) - downpayment, 0)
+  const payments = []
+
+  if (createdAt >= sessionStart && downpayment > 0) {
+    payments.push({ type: 'Abono', amount: downpayment })
+  }
+
+  // Si el saldo no se registró, se calcula lo pendiente del costo menos el abono.
+  if (deliveredAt && deliveredAt >= sessionStart && balance > 0) {
+    payments.push({ type: 'Saldo', amount: balance })
+  }
+
+  return payments
+}
+
 function CashClose() {
   // Reporte diario admin desactivado temporalmente para futuras mejoras.
   const showAdminDailyReport = false
@@ -316,17 +339,21 @@ function CashClose() {
         if (isCreatedToday && isDeliveredToday) {
           // Si fue CREADO Y ENTREGADO el mismo día: sumar abono + saldo
           const downpayment = Number(service.downpayment || 0)
-          const balance = Number(service.balance || 0)
-          const serviceCost = Number(service.serviceCost || 0)
-          const finalAmount = balance > 0 ? balance : serviceCost
+          const balance = Number(service.balance || 0) || Math.max(
+            Number(service.serviceCost || 0) - Number(service.downpayment || 0),
+            0,
+          )
+          const finalAmount = balance
           
           correctServiceTotal += downpayment + finalAmount
           console.log(`  → Creado y Entregado: suma ${downpayment} (abono) + ${finalAmount} (${balance > 0 ? 'saldo' : 'servicio'}) = ${downpayment + finalAmount}`)
         } else if (isDeliveredToday) {
           // Si fue SOLO ENTREGADO: sumar saldo (o service_cost si no hay saldo)
-          const balance = Number(service.balance || 0)
-          const serviceCost = Number(service.serviceCost || 0)
-          const amount = balance > 0 ? balance : serviceCost
+          const balance = Number(service.balance || 0) || Math.max(
+            Number(service.serviceCost || 0) - Number(service.downpayment || 0),
+            0,
+          )
+          const amount = balance
           
           correctServiceTotal += amount
           console.log(`  → Solo Entregado: suma ${amount} (${balance > 0 ? 'saldo' : 'servicio'})`)
@@ -340,6 +367,14 @@ function CashClose() {
       
       console.log('💵 Total servicios calculado:', correctServiceTotal)
       
+      // La fuente de verdad son los movimientos de pago; nunca se reemplaza
+      // un saldo cero por el costo del servicio.
+      correctServiceTotal = todayServices.reduce(
+        (totalPayments, service) => totalPayments + getServicePaymentsForSession(service, sessionStart)
+          .reduce((total, payment) => total + payment.amount, 0),
+        0,
+      )
+
       setData((prev) => ({
         ...prev,
         serviceTotal: correctServiceTotal,
@@ -776,10 +811,12 @@ function CashClose() {
                   
                   // Si fue entregado hoy, añadir saldo o service_cost
                   if (isDeliveredToday) {
-                    const balance = Number(service.balance || 0)
-                    const serviceCost = Number(service.serviceCost || 0)
-                    const amount = balance > 0 ? balance : serviceCost
-                    const type = balance > 0 ? 'Saldo' : 'Servicio'
+                    const balance = Number(service.balance || 0) || Math.max(
+                      Number(service.serviceCost || 0) - Number(service.downpayment || 0),
+                      0,
+                    )
+                    const amount = balance
+                    const type = 'Saldo'
                     
                     if (amount > 0) {
                       transactions.push({
@@ -792,12 +829,18 @@ function CashClose() {
                   }
                   
                   // Renderizar todas las transacciones de esta orden
-                  return transactions.map((tx) => (
-                    <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
-                      <span>{tx.serviceId} - {tx.type}</span>
-                      <span style={{ fontWeight: 600 }}>{money(tx.amount)}</span>
+                  if (!transactions.length) return null
+                  const amount = transactions.reduce((total, tx) => total + tx.amount, 0)
+                  const paymentDetail = transactions
+                    .map((tx) => `${tx.type}: ${money(tx.amount)}`)
+                    .join(' · ')
+
+                  return (
+                    <div key={service.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                      <span>{service.id} - {paymentDetail}</span>
+                      <span style={{ fontWeight: 600 }}>{money(amount)}</span>
                     </div>
-                  ))
+                  )
                 })}
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '12px', paddingTop: '12px', borderTop: '2px solid #172033', fontWeight: 700, color: '#008a3d', fontSize: '16px' }}>
                   <span>TOTAL</span>
