@@ -23,7 +23,7 @@ function Dashboard() {
     <section className="page-view">
       <PageHeader
         title="Dashboard principal"
-        description="Vista rapida del estado de ordenes, inventario y ventas del local."
+        description="Vista rápida del estado de órdenes, inventario y ventas del local."
       />
 
       {error ? <p className="alert-message">{error}</p> : null}
@@ -34,9 +34,9 @@ function Dashboard() {
           const normalized = stat.label.toLowerCase().trim()
           const actions = {
             'trabajos activos': () => navigate('/ordenes/gestion'),
-            'ordenes abiertas': () => navigate('/ordenes/gestion'),
+            'órdenes abiertas': () => navigate('/ordenes/gestion'),
             'productos en stock bajo': () => navigate('/inventario'),
-            'ingresos del dia': () => navigate('/ventas'),
+            'ingresos del día': () => navigate('/ventas'),
             'ingresos del día': () => navigate('/ventas'),
           }
           const action = actions[normalized]
@@ -55,7 +55,7 @@ function Dashboard() {
       <div className="dashboard-grid">
         <section className="panel">
           <div className="panel-title">
-            <h2>Ingresos de ultimos 6 dias</h2>
+            <h2>Ingresos de los últimos 6 días</h2>
             <span>Ventas y servicios</span>
           </div>
           <div className="line-chart" aria-label="Grafico de ingresos">
@@ -74,8 +74,8 @@ function Dashboard() {
 
         <section className="panel">
           <div className="panel-title">
-            <h2>Ultimas ordenes</h2>
-            <span>Trabajo tecnico</span>
+            <h2>Últimas órdenes</h2>
+            <span>Trabajo técnico</span>
           </div>
           <div className="compact-table">
             {data.recentWorkOrders.map((order) => (

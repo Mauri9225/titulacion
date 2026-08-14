@@ -90,8 +90,8 @@ function OrderHistory() {
             />
           </label>
           <select defaultValue="Cedula cliente">
-            <option>Cedula cliente</option>
-            <option>Numero de orden</option>
+            <option>Cédula cliente</option>
+            <option>Número de orden</option>
             <option>Nombre cliente</option>
           </select>
           <button className="primary-button" type="button" onClick={reload}>
@@ -140,11 +140,11 @@ function OrderHistory() {
                   <strong>{selectedOrder.client}</strong>
                 </div>
                 <div>
-                  <span>Cedula/RUC:</span>
+                  <span>Cédula/RUC:</span>
                   <strong>{selectedOrder.document}</strong>
                 </div>
                 <div>
-                  <span>Telefono:</span>
+                  <span>Teléfono:</span>
                   <strong>{selectedOrder.phone}</strong>
                 </div>
                 <div>
@@ -168,7 +168,7 @@ function OrderHistory() {
                   <strong>{selectedOrder.device}</strong>
                 </div>
                 <div>
-                  <span>Descripcion:</span>
+                  <span>Descripción:</span>
                   <strong>{selectedOrder.fault}</strong>
                 </div>
                 {selectedOrder.accessories ? (
@@ -185,13 +185,13 @@ function OrderHistory() {
                 ) : null}
                 {selectedOrder.technician ? (
                   <div>
-                    <span>Tecnico:</span>
+                    <span>Técnico:</span>
                     <strong>{selectedOrder.technician}</strong>
                   </div>
                 ) : null}
                 {selectedOrder.repairDescription ? (
                   <div>
-                    <span>Descripcion de reparacion:</span>
+                    <span>Descripción de reparación:</span>
                     <strong>{selectedOrder.repairDescription}</strong>
                   </div>
                 ) : null}
@@ -245,7 +245,7 @@ function OrderHistory() {
                     }
                   >
                     <option value="Recibido">Recibido</option>
-                    <option value="En reparacion">En reparacion</option>
+                    <option value="En reparacion">En reparación</option>
                     <option value="Listo">Listo</option>
                     <option value="Entregado">Entregado</option>
                   </select>
@@ -253,7 +253,7 @@ function OrderHistory() {
 
                 {orderForm.status === 'En reparacion' ? (
                   <label>
-                    Descripcion de reparacion
+                    Descripción de reparación
                     <textarea
                       value={orderForm.repairDescription}
                       onChange={(event) =>
@@ -343,7 +343,7 @@ function OrderHistory() {
               <th>Cliente</th>
               <th>Celular</th>
               <th>Fecha de entrega</th>
-              <th>Descripcion</th>
+              <th>Descripción</th>
               <th>Modelo</th>
               <th>Marca</th>
               <th>Estado</th>

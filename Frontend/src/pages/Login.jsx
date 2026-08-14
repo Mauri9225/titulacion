@@ -43,8 +43,8 @@ function Login() {
         </div>
 
         <div className="login-copy">
-          <h1>Inicia sesion para continuar</h1>
-          <p>accede a tu cuenta</p>
+          <h1>Inicia sesión para continuar</h1>
+          <p>Accede a tu cuenta</p>
         </div>
 
         {error ? <p className="alert-message">{error}</p> : null}
@@ -76,7 +76,7 @@ function Login() {
             <button
               type="button"
               onClick={() => setShowPassword((current) => !current)}
-              aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               style={{
                 border: 'none',
                 background: 'transparent',

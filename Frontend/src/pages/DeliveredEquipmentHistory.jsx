@@ -49,7 +49,7 @@ function DeliveredEquipmentHistory() {
           <label className="input-control slim">
             <Search size={18} />
             <input
-              placeholder="Buscar por cedula, cliente u orden"
+              placeholder="Buscar por cédula, cliente u orden"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -72,7 +72,7 @@ function DeliveredEquipmentHistory() {
               <div className="modal-header">
                 <div>
                   <h2>Detalle del equipo entregado</h2>
-                  <span>Informacion completa del servicio</span>
+                  <span>Información completa del servicio</span>
                 </div>
                 <button
                   type="button"
@@ -93,7 +93,7 @@ function DeliveredEquipmentHistory() {
                   <strong>{selectedOrder.client}</strong>
                 </div>
                 <div>
-                  <span>Cedula/RUC:</span>
+                  <span>Cédula/RUC:</span>
                   <strong>{selectedOrder.document}</strong>
                 </div>
                 <div>
@@ -117,12 +117,12 @@ function DeliveredEquipmentHistory() {
                   <strong>{selectedOrder.model}</strong>
                 </div>
                 <div>
-                  <span>Descripcion:</span>
+                  <span>Descripción:</span>
                   <strong>{selectedOrder.fault}</strong>
                 </div>
                 {selectedOrder.repairDescription ? (
                   <div>
-                    <span>Descripcion de reparacion:</span>
+                    <span>Descripción de reparación:</span>
                     <strong>{selectedOrder.repairDescription}</strong>
                   </div>
                 ) : null}
@@ -178,7 +178,7 @@ function DeliveredEquipmentHistory() {
                       <th>Orden</th>
                       <th>Fecha ingreso</th>
                       <th>Cliente</th>
-                      <th>Telefono</th>
+                      <th>Teléfono</th>
                       <th>Fecha entrega</th>
                       <th>Equipo</th>
                       <th>Estado</th>
@@ -221,7 +221,7 @@ function DeliveredEquipmentHistory() {
               <th>Orden</th>
               <th>Fecha ingreso</th>
               <th>Cliente</th>
-              <th>Telefono</th>
+              <th>Teléfono</th>
               <th>Fecha entrega</th>
               <th>Equipo</th>
               <th>Estado</th>
