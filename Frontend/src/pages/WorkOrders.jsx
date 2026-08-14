@@ -122,7 +122,7 @@ function WorkOrders() {
             <h2>Cliente</h2>
             <table>
               <tr><td><strong>Nombre</strong></td><td>${escapeHtml(receipt.client || '')}</td></tr>
-              <tr><td><strong>Cedula/RUC</strong></td><td>${escapeHtml(receipt.document || '')}</td></tr>
+              <tr><td><strong>Cédula/RUC</strong></td><td>${escapeHtml(receipt.document || '')}</td></tr>
               <tr><td><strong>Teléfono</strong></td><td>${escapeHtml(receipt.phone || '')}</td></tr>
             </table>
           </div>
@@ -209,7 +209,7 @@ function WorkOrders() {
 
   async function searchClient() {
     if (!form.document) {
-      setError('Ingresa una cedula/RUC para buscar.')
+      setError('Ingresa una cédula/RUC para buscar.')
       return
     }
 
@@ -242,7 +242,7 @@ function WorkOrders() {
     <section className="page-view">
       <PageHeader
         title="Nueva orden de trabajo"
-        description="Registra equipos recibidos para reparacion y seguimiento tecnico."
+        description="Registra equipos recibidos para reparación y seguimiento técnico."
       />
 
       {message ? <p className="success-message">{message}</p> : null}
@@ -261,7 +261,7 @@ function WorkOrders() {
           <fieldset>
             <legend>Datos del cliente</legend>
             <label>
-              Cedula/RUC
+              Cédula/RUC
               <div className="inline-input">
                 <input
                   placeholder="Ej. 1726000001"
@@ -291,7 +291,7 @@ function WorkOrders() {
               />
             </label>
             <label>
-              Telefono
+              Teléfono
                 <input
                   placeholder="Ej. 0998765432"
                   type="tel"
@@ -343,7 +343,7 @@ function WorkOrders() {
             <label>
               IMEI / Observaciones
               <textarea
-                placeholder="Condicion del equipo, golpes, humedad u otros detalles"
+                placeholder="Condición del equipo, golpes, humedad u otros detalles"
                 value={form.notes}
                 onChange={(event) => updateField('notes', event.target.value)}
               />

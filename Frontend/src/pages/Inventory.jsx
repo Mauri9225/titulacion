@@ -131,7 +131,7 @@ function Inventory() {
                 />
               </label>
               <label>
-                Categoria
+                Categoría
                 <input
                   type="text"
                   value={productForm.category}
@@ -192,9 +192,9 @@ function Inventory() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Codigo</th>
+              <th>Código</th>
               <th>Producto</th>
-              <th>Categoria</th>
+              <th>Categoría</th>
               <th>Stock</th>
               <th>Precio (USD)</th>
               <th>Estado</th>
