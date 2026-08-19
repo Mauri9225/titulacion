@@ -29,7 +29,7 @@ async function getSummary() {
     query(`
       SELECT
         COUNT(*) FILTER (WHERE status <> 'Entregado') AS active_work_orders,
-        COUNT(*) FILTER (WHERE status IN ('Recibido', 'En reparacion')) AS open_orders,
+        COUNT(*) FILTER (WHERE status = 'Entregado') AS delivered_work_orders,
         (SELECT COUNT(*) FROM products WHERE stock <= min_stock) AS low_stock_products,
         (
           COALESCE((SELECT SUM(total) FROM sales WHERE date::date = CURRENT_DATE), 0)
@@ -90,7 +90,11 @@ async function getSummary() {
   return {
     stats: [
       { label: 'Trabajos activos', value: Number(stats.active_work_orders), tone: 'green' },
-      { label: 'Ordenes abiertas', value: Number(stats.open_orders), tone: 'blue' },
+      {
+        label: 'Equipos entregados',
+        value: Number(stats.delivered_work_orders),
+        tone: 'blue',
+      },
       {
         label: 'Productos en stock bajo',
         value: Number(stats.low_stock_products),

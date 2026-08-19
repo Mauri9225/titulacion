@@ -34,9 +34,8 @@ function Dashboard() {
           const normalized = stat.label.toLowerCase().trim()
           const actions = {
             'trabajos activos': () => navigate('/ordenes/gestion'),
-            'órdenes abiertas': () => navigate('/ordenes/gestion'),
+            'equipos entregados': () => navigate('/ordenes/historial'),
             'productos en stock bajo': () => navigate('/inventario'),
-            'ingresos del día': () => navigate('/ventas'),
             'ingresos del día': () => navigate('/ventas'),
           }
           const action = actions[normalized]
@@ -79,7 +78,19 @@ function Dashboard() {
           </div>
           <div className="compact-table">
             {data.recentWorkOrders.map((order) => (
-              <article key={order.id}>
+              <article
+                key={order.id}
+                className="clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(order.status === 'Entregado' ? '/ordenes/historial' : '/ordenes/gestion')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    navigate(order.status === 'Entregado' ? '/ordenes/historial' : '/ordenes/gestion')
+                  }
+                }}
+              >
                 <strong>{order.id}</strong>
                 <span>{order.client}</span>
                 <span>{order.device}</span>
