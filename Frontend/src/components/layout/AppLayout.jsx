@@ -18,8 +18,8 @@ const navItems = [
   { to: '/ventas', label: 'Ventas', icon: ShoppingCart },
   { to: '/ordenes/nueva', label: 'Orden de Trabajo', icon: ClipboardList },
   { to: '/ordenes/gestion', label: 'Gestión de ordenes', icon: History },
-  { to: '/ordenes/historial', label: 'Entregados', icon: Archive },
-  { to: '/inventario', label: 'Inventario', icon: Archive },
+  { to: '/ordenes/historial', label: 'Equipos Entregados', icon: Archive },
+  { to: '/inventario', label: 'Inventario Productos', icon: Archive },
   { to: '/caja', label: 'Cierre de Caja', icon: Wallet },
   { to: '/usuarios', label: 'Usuarios', icon: Users, roles: ['admin'] },
 ]

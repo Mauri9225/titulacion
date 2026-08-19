@@ -56,7 +56,7 @@ function Users() {
     <section className="page-view">
       <PageHeader
         title="Usuarios"
-        description="Administra accesos para administradores, tecnicos y vendedores."
+        description="Administra accesos para administradores, técnicos/vendedores."
         action={
           <button className="primary-button" type="button" onClick={() => setIsModalOpen(true)}>
             <Plus size={17} />
@@ -78,7 +78,7 @@ function Users() {
             <div className="modal-header">
               <div>
                 <h2>Nuevo usuario</h2>
-                <span>Crea accesos para nuevos tecnicos o vendedores.</span>
+                <span>Crea accesos para nuevos técnicos o vendedores.</span>
               </div>
               <button className="secondary-button" type="button" onClick={closeModal}>
                 Cerrar
@@ -110,7 +110,7 @@ function Users() {
                 />
               </label>
               <label>
-                Contrasena
+                Contraseña
                 <input
                   type="password"
                   value={form.password}
@@ -128,7 +128,7 @@ function Users() {
                     setForm((current) => ({ ...current, role: event.target.value }))
                   }
                 >
-                  <option value="staff">Tecnico/Vendedor</option>
+                  <option value="staff">Técnico/Vendedor</option>
                   <option value="admin">Administrador</option>
                 </select>
               </label>
@@ -162,7 +162,7 @@ function Users() {
               <tr key={user.id}>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
-                <td>{user.role === 'admin' ? 'Administrador' : 'Tecnico/Vendedor'}</td>
+                <td>{user.role === 'admin' ? 'Administrador' : 'Técnico/Vendedor'}</td>
                 <td>
                   <span className={`status ${user.active ? 'disponible' : 'recibido'}`}>
                     {user.active ? 'Activo' : 'Inactivo'}

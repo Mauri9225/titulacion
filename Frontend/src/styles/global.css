@@ -480,6 +480,16 @@ p {
   font-size: 13px;
 }
 
+.compact-table article.clickable {
+  cursor: pointer;
+}
+
+.compact-table article.clickable:hover,
+.compact-table article.clickable:focus-visible {
+  border-color: #93c5fd;
+  outline: none;
+}
+
 .product-list {
   display: grid;
   gap: 8px;

@@ -66,7 +66,7 @@ function Login() {
             <Lock size={18} />
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="Contrasena"
+              placeholder="Contraseña"
               value={form.password}
               onChange={(event) =>
                 setForm((current) => ({ ...current, password: event.target.value }))
@@ -98,7 +98,7 @@ function Login() {
               }
             >
               <option value="admin">Administrador</option>
-              <option value="staff">Tecnico/Vendedor</option>
+              <option value="staff">Técnico/Vendedor</option>
             </select>
           </label>
           <button className="primary-button full" type="submit" disabled={isSubmitting}>
