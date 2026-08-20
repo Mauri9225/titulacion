@@ -1,6 +1,13 @@
 const { query } = require('../config/database');
 
 const DEFAULT_OPENING_CASH = 55;
+const ECUADOR_TIME_ZONE = 'America/Guayaquil';
+
+function getEcuadorDate() {
+  return new Intl.DateTimeFormat('es-EC', {
+    timeZone: ECUADOR_TIME_ZONE,
+  }).format(new Date());
+}
 
 function resolveOpeningCash(value) {
   if (value === undefined || value === null || value === '') {
@@ -66,15 +73,17 @@ function normalizeCashClose(row) {
 async function getTodaySummary(authUser = null) {
   await ensureCashClosingSchema();
 
-  const today = new Date().toLocaleDateString('es-EC');
+  const today = getEcuadorDate();
   const userName = authUser?.name || authUser?.email || 'Tecnico';
 
   const activeSession = await query(
     `SELECT id, date, "user", opening_cash, counted_cash, opened_at, closed_at
-     FROM cash_closings
-     WHERE closed_at IS NULL
+      FROM cash_closings
+      WHERE closed_at IS NULL
+       AND (opened_at AT TIME ZONE $1)::date = TO_DATE($2, 'DD/MM/YYYY')
      ORDER BY opened_at DESC, id DESC
      LIMIT 1`,
+     [ECUADOR_TIME_ZONE, today],
   );
 
   const closedSessionToday = await getLatestClosedSessionToday(today);
@@ -171,13 +180,15 @@ async function nextCashCloseId() {
   return `CC-${String(result.rows[0].next_id).padStart(4, '0')}`;
 }
 
-async function getActiveSession() {
+async function getActiveSession(today = getEcuadorDate()) {
   const result = await query(
     `SELECT id, date, "user", opening_cash, counted_cash, opened_at, closed_at
      FROM cash_closings
      WHERE closed_at IS NULL
+       AND (opened_at AT TIME ZONE $1)::date = TO_DATE($2, 'DD/MM/YYYY')
      ORDER BY opened_at DESC, id DESC
      LIMIT 1`,
+    [ECUADOR_TIME_ZONE, today],
   );
 
   return result.rowCount ? result.rows[0] : null;
@@ -201,7 +212,7 @@ async function create(payload, authUser = null) {
   await ensureCashClosingSchema();
   const summary = await getTodaySummary(authUser);
   const userName = payload.user || authUser?.name || summary.user || 'Tecnico';
-  const today = new Date().toLocaleDateString('es-EC');
+  const today = getEcuadorDate();
   const latestClosedToday = await getLatestClosedSessionToday(today);
   const openingCash = resolveOpeningCash(payload.openingCash ?? summary.openingCash);
   const countedCash = Number(payload.countedCash ?? summary.countedCash ?? 0);

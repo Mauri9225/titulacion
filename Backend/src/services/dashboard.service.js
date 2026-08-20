@@ -1,5 +1,7 @@
 const { query } = require('../config/database');
 
+const ECUADOR_TIME_ZONE = 'America/Guayaquil';
+
 function normalizeRecentOrder(row) {
   return {
     id: row.id,
@@ -32,12 +34,16 @@ async function getSummary() {
         COUNT(*) FILTER (WHERE status = 'Entregado') AS delivered_work_orders,
         (SELECT COUNT(*) FROM products WHERE stock <= min_stock) AS low_stock_products,
         (
-          COALESCE((SELECT SUM(total) FROM sales WHERE date::date = CURRENT_DATE), 0)
+          COALESCE((
+            SELECT SUM(total)
+            FROM sales
+            WHERE (date AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date = (NOW() AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date
+          ), 0)
           +
           COALESCE((
             SELECT SUM(downpayment)
             FROM work_orders
-            WHERE created_at::date = CURRENT_DATE
+            WHERE (created_at AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date = (NOW() AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date
           ), 0)
           +
           COALESCE((
@@ -48,22 +54,27 @@ async function getSummary() {
               END
             )
             FROM work_orders
-            WHERE status = 'Entregado' AND delivered_at::date = CURRENT_DATE
+            WHERE status = 'Entregado'
+              AND (delivered_at AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date = (NOW() AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date
           ), 0)
         ) AS income_today
       FROM work_orders
     `),
     query(`
       SELECT day::date AS day, COALESCE(SUM(amount), 0) AS total
-      FROM generate_series(CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE, INTERVAL '1 day') AS day
+      FROM generate_series(
+        (NOW() AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date - INTERVAL '5 days',
+        (NOW() AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date,
+        INTERVAL '1 day'
+      ) AS day
       LEFT JOIN (
-        SELECT date::date AS income_date, total AS amount FROM sales
+        SELECT (date AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date AS income_date, total AS amount FROM sales
         UNION ALL
-        SELECT created_at::date AS income_date, downpayment AS amount
+        SELECT (created_at AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date AS income_date, downpayment AS amount
         FROM work_orders
         WHERE downpayment > 0
         UNION ALL
-        SELECT delivered_at::date AS income_date,
+        SELECT (delivered_at AT TIME ZONE '${ECUADOR_TIME_ZONE}')::date AS income_date,
                CASE
                  WHEN balance > 0 THEN balance
                  ELSE GREATEST(service_cost - downpayment, 0)
